@@ -1,0 +1,218 @@
+---
+title: "INSIDER-facebook performance dashboard"
+params:
+  get_new_data: False
+output: flexdashboard::flex_dashboard
+---
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE, cache = FALSE}
+# Libraries
+library(tidyverse)
+library(knitr)
+library(highcharter)
+library(Hmisc)
+library(RColorBrewer)
+library(plotly)
+library(databrew)
+
+# Turn off scientific notation
+options(scipen = '999')
+
+# Custom functions
+source('helpers.R')
+
+# Basic knitr options
+knitr::opts_chunk$set(comment = NA, 
+               echo = FALSE, 
+               warning = FALSE, 
+               message = FALSE, 
+               error = TRUE, # Render report, even with errors
+               cache = F)
+
+# Get new data if need be
+if(params$get_new_data){
+  owd <- getwd()
+  setwd('../lib/')
+  system('python get_data.py')
+  setwd(owd)
+}
+
+# Read in the data
+df <- read_csv('../data/historical.csv')
+
+# Re-format the date
+df$date <- as.Date(df$date)
+
+# Ensure that only the most recent of each category is in the data
+df <- 
+  df %>%
+  arrange(end_time) %>%
+  group_by(key, name, date) %>%
+  mutate(keep = end_time == max(end_time, na.rm = TRUE)) %>%
+  ungroup %>%
+  filter(keep) %>%
+  dplyr::select(date, end_time, key, name, value)
+
+# Remove any duplicates
+df <- 
+  df %>%
+  arrange(end_time) %>%
+  group_by(key, name, date) %>%
+  mutate(n = n()) %>%
+  filter(n == 1) %>%
+  ungroup %>%
+  dplyr::select(-n)
+
+# Keep only values after a certain date
+starter <- min(df$date[df$value > 0], na.rm = TRUE)
+df <- df %>%
+  filter(date >= starter)
+
+# Clean up names
+df$x <- gsub('thisis|insider', '', tolower(df$name))
+df$name <- ifelse(df$name != 'thisisinsider', df$x, df$name)
+df$name[df$name == 'thisisinsder'] <- 'This Is Insider'
+df$name <- Hmisc::capitalize(df$name)
+df$x <- NULL
+
+# Get a cumulative count
+df <- 
+  df %>%
+  arrange(date) %>%
+  group_by(key, name) %>%
+  mutate(value_cum = cum_summer(value))
+```
+
+
+ 
+Home
+=====================================  
+    
+   
+Column {.tabset}
+-------------------------------------
+   
+
+### Views to fan adds correlation
+
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys).
+    
+```{r}
+plot_data <- 
+  df %>%
+  filter(!is.na(value)) %>%
+  group_by(name, key) %>%
+  filter(date == max(date)) %>%
+  group_by(name) %>%
+  summarise(page_views = dplyr::first(value[key == 'page_views']),
+            fan_adds = dplyr::first(value[key == 'fan_adds'])) %>%
+  ungroup
+
+g <- ggplot(data = plot_data,
+       aes(x = page_views,
+           y = fan_adds,
+           label = name)) +
+  geom_point(alpha = 0.6,
+             color = 'darkorange',
+             size = 4) +
+  labs(x = 'Page views',
+       y = 'Fan adds',
+       title = 'Exposure-quality association',
+       subtitle = 'Some channels inspire views; others inspire likes') +
+  theme_databrew() +
+  geom_smooth(method = 'lm', se = FALSE)
+ggplotly(g, tootip = 'name')
+```
+ 
+
+### View to fan adds over time
+
+```{r}
+cols <- c('blue', 'darkorange')
+ggplot(data = df %>%
+         filter(key != 'fan_count'),
+       aes(x = date,
+           y = value_cum,
+           color = key)) +
+  geom_line(alpha = 0.7,
+            size = 2) +
+  facet_wrap(~name) +
+  theme_databrew(base_size = 13) +
+  labs(x = 'Date',
+       y = '',
+       title = 'Page views and fan adds over time',
+       subtitle = 'Different trajectories suggest different market use') +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_color_manual(name = '',
+                     values = cols)
+  
+```
+   
+Column {.tabset}
+-------------------------------------
+   
+### Fan adds
+
+```{r}
+time_chart(the_key = 'fan_adds') +
+  theme_databrew()
+```   
+
+    
+### Page views
+    
+```{r}
+time_chart(the_key = 'page_views') +
+  theme_databrew()
+```
+
+    
+
+
+
+
+Data {data-orientation=rows}
+=====================================     
+   
+Row {data-height=300}
+-------------------------------------
+
+### Data repository
+
+Soon a link to a stable repository for data (google docs, for example) will be placed here.
+
+Row {data-height=700}
+-------------------------------------
+   
+### Data explorer
+
+```{r}
+DT::datatable(df %>%
+                dplyr::select(date, key, name, value, value_cum))
+```   
+    
+### Overall views over time
+
+```{r}
+x <- df %>%
+  ungroup %>%
+  filter(key != 'fan_count') %>%
+  mutate(key = ifelse(key == 'fan_adds', 'Fan adds', 'Page views')) %>%
+  group_by(date, key) %>%
+  summarise(n = sum(value_cum))
+cols <- c('blue', 'darkorange')
+
+ggplot(data = x,
+       aes(x = date,
+           y = n)) +
+  geom_line(aes(color = key),
+            alpha = 0.6) +
+  theme_databrew() +
+  labs(x = 'Date',
+       y = 'Value',
+       title = 'Aggregated impact: all 16 pages') +
+  scale_color_manual(name = '',
+                     values = cols)
+```
+
+ 
