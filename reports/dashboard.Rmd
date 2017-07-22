@@ -215,4 +215,23 @@ ggplot(data = x,
                      values = cols)
 ```
 
- 
+
+Yesterday
+=====================================  
+    
+   
+Column {.tabset}
+-------------------------------------
+   
+
+### Yesterday's views
+
+```{r}
+barplot(1:10)
+```
+
+### Yesterday's likes
+
+```{r}
+barplot(1:10)
+```
