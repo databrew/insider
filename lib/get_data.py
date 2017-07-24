@@ -42,7 +42,7 @@ def get_page_metric_date_range(name = 'Insiderinventions', start = "2017-06-20",
 	query = name + '/insights/' + metric + '?period=day&since=' + start + '&until=' + stop
 	try:
 		this_period = graph.request(query)
-		time.sleep(0.25)
+		# time.sleep(0.25)
 		the_data = this_period['data'][0]['values']
 		# Differential handling of those which have values broken down by type
 		if "_by_" in metric:
@@ -84,7 +84,7 @@ def get_page_metric_all(name = 'Insiderinventions', metric = "page_negative_feed
 	this_metric = metric
 	out = pd.DataFrame()
 	for i in range(0, len(starts)):
-		time.sleep(0.1)
+		# time.sleep(0.1)
 		this_start = starts[i]
 		print '------ ' + this_start
 		this_stop = stops[i]
@@ -149,14 +149,13 @@ else:
 			print '--- Combining data from ' + this_page + ' with other pages'
 			historical = historical.append(bound)
 		except:
-			pass
-
+			continue
 	# Write the historical data to a csv
-	historical.to_csv('../data/historical.csv', index = False)
+	historical.to_csv('../data/historical.csv', index = False, encoding='utf-8')
 
 # Now that we have the historical data, we'll also save a snapshot at today
 # (in case things ever break in the future)
-historical.to_csv('../data/backups/' + str(today) + '.csv', index = False)
+historical.to_csv('../data/backups/' + str(today) + '.csv', index = False, encoding='utf-8')
 
 # Convert to date
 historical['date'] = historical['end_time'].astype('datetime64[ns]')
@@ -223,7 +222,7 @@ for i in range(0, len(facebook_pages)):
 		print '--- Combining data from ' + this_page + ' with other pages'
 		recent = recent.append(bound)
 	except:
-		pass
+		continue
 
 # Add a date column, so as to be compatible with historical
 recent['date'] = recent['end_time'].astype('datetime64[ns]')
@@ -237,4 +236,4 @@ historical = historical.append(recent)
 historical = historical[['date', 'end_time', 'key', 'sub_key', 'name', 'value']]
 
 # Over-write the historical csv
-historical.to_csv('../data/historical.csv', index = False)
+historical.to_csv('../data/historical.csv', index = False, encoding='utf-8')
