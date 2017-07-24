@@ -1,12 +1,16 @@
 # Load libraries
 import requests as re
 import pandas as pd
+import time
 from time import gmtime, strftime
 from datetime import datetime, timedelta
 from dateutil import parser
 import yaml
 import os.path
 import numpy as np
+from itertools import chain
+import re
+
 
 import os
 os.chdir('/home/joebrew/Documents/insider/lib')
@@ -32,98 +36,69 @@ token = credentials['app_token']
 # https://medium.com/towards-data-science/how-to-use-facebook-graph-api-and-extract-data-using-python-1839e19d6999
 graph = facebook.GraphAPI(access_token=token, version = 2.7)
 
+# Define a function for retrieving a page metric, like
+# "page_negative_feedback"
+def get_page_metric_date_range(name = 'Insiderinventions', start = "2017-06-20", stop = "2017-07-20", metric = "page_negative_feedback"):
+	query = name + '/insights/' + metric + '?period=day&since=' + start + '&until=' + stop
+	try:
+		this_period = graph.request(query)
+		time.sleep(0.25)
+		the_data = this_period['data'][0]['values']
+		# Differential handling of those which have values broken down by type
+		if "_by_" in metric:
+			out = pd.DataFrame()
+			for i in range(0, len(the_data)):
+				sub_data = the_data[i]['value']
+				sub_df = pd.DataFrame(pd.Series(sub_data), columns = {'value'})
+				sub_df['sub_key'] = sub_df.index
+				end_time = pd.Series(the_data[i]["end_time"]).tolist
+				sub_df['end_time'] = pd.Series(the_data[i]["end_time"], index = sub_df.index)
+				sub_df['key'] = metric
+				sub_df['name'] = name
+				sub_df = sub_df.reset_index()
+				out = out.append(sub_df)
+			out = out[["end_time", "value", "name", "key", "sub_key"]]
+			# out = out.reset_index()
+		else:
+			series = pd.Series(the_data)
+			out = pd.DataFrame.from_records(series)
+			# Clean up the dataframe a bit
+			out['name'] = name
+			out['key'] = metric
+			out['sub_key'] = 'NA'
+		return(out)
+	except:
+		print " ERROR FOR " + query
+
+# Define a function for retrieving page_negative_feedback (or other metrics) over all time
+def get_page_metric_all(name = 'Insiderinventions', metric = "page_negative_feedback"):
+	starts = ['2015-01-01', '2015-04-01', '2015-07-01', '2015-10-01', '2016-01-01', '2016-04-01', '2016-07-01', '2016-10-01', '2017-01-01', '2017-04-01', '2017-07-01', '2017-07-21']
+	stops = []
+	for i in range(1, len(starts)):
+		stops.append((parser.parse(starts[i]) - timedelta(days=1)).strftime('%Y-%m-%d'))
+	# Remove the last start (we'll use the not-all-time function for this)
+	starts = starts[0:11]
+	# Loop through each date range, getting the result for that range
+	# out = []
+	this_name = name
+	this_metric = metric
+	out = pd.DataFrame()
+	for i in range(0, len(starts)):
+		time.sleep(0.1)
+		this_start = starts[i]
+		print '------ ' + this_start
+		this_stop = stops[i]
+		dataframe = get_page_metric_date_range(name = this_name, start = this_start, stop = this_stop, metric = this_metric)
+		out = out.append(dataframe, ignore_index = True)
+	return(out)
+
 # Define a function for retrieving the "total likes as of today"
 def get_likes_today(name = "Insiderinventions"):
 	likes = graph.request(name + "?fields=fan_count")
 	likes = likes.get("fan_count")
-	df = pd.DataFrame({'end_time':today, 'value':likes, 'name': name, 'key':'fan_count'}, index = [0])
-	df = df[['end_time', 'value', 'name', 'key']]
+	df = pd.DataFrame({'end_time':today, 'value':likes, 'name': name, 'key':'fan_count', "sub_key":"NA"}, index = [0])
+	df = df[['end_time', 'value', 'name', 'key','sub_key']]
 	return df
-
-# Define function for getting page views
-def get_page_views_date_range(name = "Insiderinventions", start = "2017-06-20", stop = "2017-07-20"):
-	# Set start to stop, if necessary
-	if stop is None:
-		stop = start
-	# Parse the times
-	start = parser.parse(start)
-	stop = parser.parse(stop)
-	# change start to unix time
-	start = start.strftime("%s")
-	stop = stop.strftime("%s")
-	query = name + '/insights/page_views?since=' + str(start) + '&until=' + str(stop)
-	out = graph.request(query)
-	out = out['data'][0]['values']
-	series = pd.Series(out)
-	out = pd.DataFrame.from_records(series)
-	# Clean up the dataframe a bit
-	out['name'] = name
-	out['key'] = 'page_views'
-	return(out)
-
-# Define function for getting page views for all time
-def get_page_views_all(name = "Insiderinventions"):
-	starts = ['2015-01-01', '2015-04-01', '2015-07-01', '2015-10-01', '2016-01-01', '2016-04-01', '2016-07-01', '2016-10-01', '2017-01-01', '2017-04-01', '2017-07-01', '2017-07-21']
-	stops = []
-	for i in range(1, len(starts)):
-		stops.append((parser.parse(starts[i]) - timedelta(days=1)).strftime('%Y-%m-%d'))
-	# Remove the last start (we'll use the not-all-time function for this)
-	starts = starts[0:11]
-	# Loop through each date range, getting the result for that range
-	# out = []
-	out = pd.DataFrame()
-	for i in range(0, len(starts)):
-		this_start = starts[i]
-		print '------ ' + this_start
-		this_stop = stops[i]
-		query = name + '/insights/page_views?since=' + this_start + '&until=' + this_stop
-		this_period = graph.request(query)
-		the_data = this_period['data'][0]['values']
-		series = pd.Series(the_data)
-		dataframe = pd.DataFrame.from_records(series)
-		out = out.append(dataframe, ignore_index = True)
-	# Clean up the dataframe a bit
-	out['name'] = name
-	out['key'] = 'page_views'
-	return(out)
-
-# Define function for getting page fan adds (can only take a range of 93 days max)
-def get_page_fan_adds_date_range(name = "Insiderinventions", start = "2017-06-20", stop = '2017-07-20'):
-	query = name + '/insights/page_fan_adds?since=' + start + '&until=' + stop
-	this_period = graph.request(query)
-	the_data = this_period['data'][0]['values']
-	series = pd.Series(the_data)
-	out = pd.DataFrame.from_records(series)
-	# Clean up the dataframe a bit
-	out['name'] = name
-	out['key'] = 'fan_adds'
-	return(out)
-
-# Define function for getting page fan adds over all time
-def get_page_fan_adds_all(name = "Insiderinventions"):
-	starts = ['2015-01-01', '2015-04-01', '2015-07-01', '2015-10-01', '2016-01-01', '2016-04-01', '2016-07-01', '2016-10-01', '2017-01-01', '2017-04-01', '2017-07-01', '2017-07-21']
-	stops = []
-	for i in range(1, len(starts)):
-		stops.append((parser.parse(starts[i]) - timedelta(days=1)).strftime('%Y-%m-%d'))
-	# Remove the last start (we'll use the not-all-time function for this)
-	starts = starts[0:11]
-	# Loop through each date range, getting the result for that range
-	# out = []
-	out = pd.DataFrame()
-	for i in range(0, len(starts)):
-		this_start = starts[i]
-		print '------ ' + this_start
-		this_stop = stops[i]
-		query = name + '/insights/page_fan_adds?since=' + this_start + '&until=' + this_stop
-		this_period = graph.request(query)
-		the_data = this_period['data'][0]['values']
-		series = pd.Series(the_data)
-		dataframe = pd.DataFrame.from_records(series)
-		out = out.append(dataframe, ignore_index = True)
-	# Clean up the dataframe a bit
-	out['name'] = name
-	out['key'] = 'fan_adds'
-	return(out)
 
 # Define a list of the pages for which we're doing this
 facebook_pages = ["Insiderinventions", "Insiderfood", "thisisinsiderfitness", "Insidercheese", "INSIDERpopculture", "Insiderdessert", "Insiderscience", "thisisinsiderart", "thisisinsiderdesign", "thisisinsider", "thisisinsiderstyle", "thisisinsidertravel", "thisisinsidervideo", "Insiderbeauty", "thisisinsiderhome", "insiderkitchen"]
@@ -143,22 +118,45 @@ else:
 		print 'Working on history for ' + this_page
 		# Get all page views ever
 		print '--- Getting all page views for ' + this_page
-		page_views_all = get_page_views_all(name = this_page)
+		page_views_all = get_page_metric_all(name = this_page, metric = "page_views")
 		# Get all fan adds ever
 		print '--- Getting all fan adds for ' + this_page
-		fan_adds_all = get_page_fan_adds_all(name = this_page)
-		# Bind the two dataframes
+		fan_adds_all = get_page_metric_all(name = this_page, metric = "page_fan_adds")
+		# Get all negative feedback ever
+		print '--- Getting all negative feedback for ' + this_page
+		negative_feedback_all = get_page_metric_all(name = this_page, metric = "page_negative_feedback")
+		# Get storytellers by country
+		print '--- Getting storytellers by country for ' + this_page
+		page_storytellers_by_country = get_page_metric_all(name = this_page, metric = "page_storytellers_by_country")
+		# Get storytellers by city
+		print '--- Getting storytellers by city for ' + this_page
+		page_storytellers_by_city = get_page_metric_all(name = this_page, metric = "page_storytellers_by_city")
+		# Get page_video_views
+		print '--- Getting page_video_views for' + this_page
+		page_video_views = get_page_metric_all(name = this_page, metric = "page_video_views")
+		# Get page_storytellers_by_age_gender
+		print '--- Getting page_storytellers_by_age_gender for' + this_page
+		page_storytellers_by_age_gender = get_page_metric_all(name = this_page, metric = "page_storytellers_by_age_gender")
+		# Bind together everything
 		bound = page_views_all.append(fan_adds_all)
+		bound = bound.append(negative_feedback_all)
+		bound = bound.append(page_storytellers_by_country)
+		bound = bound.append(page_storytellers_by_city)
+		bound = bound.append(page_video_views)
+		bound = bound.append(page_storytellers_by_age_gender)
 		# Bind those dataframes to the master one
-		print '--- Combining data from ' + this_page + ' with other pages'
-		historical = historical.append(bound)
+		try:
+			print '--- Combining data from ' + this_page + ' with other pages'
+			historical = historical.append(bound)
+		except:
+			pass
 
 	# Write the historical data to a csv
-	historical.to_csv('../data/historical.csv')
+	historical.to_csv('../data/historical.csv', index = False)
 
 # Now that we have the historical data, we'll also save a snapshot at today
 # (in case things ever break in the future)
-historical.to_csv('../data/backups/' + str(today) + '.csv')
+historical.to_csv('../data/backups/' + str(today) + '.csv', index = False)
 
 # Convert to date
 historical['date'] = historical['end_time'].astype('datetime64[ns]')
@@ -187,21 +185,45 @@ for i in range(0, len(facebook_pages)):
 	# Define this page
 	this_page = facebook_pages[i]
 	print 'Working on recent data for ' + this_page
-	# Get all page views ever
+	# Get all page views recent
 	print '--- Getting recent page views for ' + this_page
-	page_views_recent = get_page_views_date_range(name = this_page, start = recent_start_f, stop = recent_stop_f)
-	# Get all fan adds ever
+	page_views_recent = get_page_metric_date_range(name = this_page, start = recent_start_f, stop = recent_stop_f, metric = "page_views")
+	# Get all fan adds recent
 	print '--- Getting recent fan adds for ' + this_page
-	fan_adds_recent = get_page_fan_adds_date_range(name = this_page, start = recent_start_f, stop = recent_stop_f)
+	fan_adds_recent = get_page_metric_date_range(name = this_page, start = recent_start_f, stop = recent_stop_f, metric = "page_fan_adds")
 	# Get likes as of today
 	print '--- Getting likes as of today for ' + this_page
 	likes_now = get_likes_today(name = this_page)
-	# Bind the three dataframes
+	# Get negative feedback recently
+	print '--- Getting recent negative feedback for ' + this_page
+	page_negative_feedback_recent = get_page_metric_date_range(name = this_page, start = recent_start_f, stop = recent_stop_f, metric = "page_negative_feedback")
+	# Get storytellers by country
+	print '--- Getting storytellers by country for ' + this_page
+	page_storytellers_by_country = get_page_metric_date_range(name = this_page, metric = "page_storytellers_by_country", start = recent_start_f, stop = recent_stop_f)
+	# Get storytellers by city
+	print '--- Getting storytellers by city for ' + this_page
+	page_storytellers_by_city = get_page_metric_date_range(name = this_page, metric = "page_storytellers_by_city", start = recent_start_f, stop = recent_stop_f)
+	# Get page_video_views
+	print '--- Getting page_video_views for ' + this_page
+	page_video_views = get_page_metric_date_range(name = this_page, metric = "page_video_views", start = recent_start_f, stop = recent_stop_f)
+	# Get page_video_views
+	print '--- Getting page_storytellers_by_age_gender for ' + this_page
+	page_storytellers_by_age_gender = get_page_metric_date_range(name = this_page, metric = "page_storytellers_by_age_gender", start = recent_start_f, stop = recent_stop_f)
+
+	# Bind the dataframes
 	bound = page_views_recent.append(fan_adds_recent)
 	bound = bound.append(likes_now)
+	bound = bound.append(page_negative_feedback_recent)
+	bound = bound.append(page_storytellers_by_country)
+	bound = bound.append(page_storytellers_by_city)
+	bound = bound.append(page_video_views)
+	bound = bound.append(page_storytellers_by_age_gender)
 	# Bind those dataframes to the master one
-	print '--- Combining data from ' + this_page + ' with other pages'
-	recent = recent.append(bound)
+	try:
+		print '--- Combining data from ' + this_page + ' with other pages'
+		recent = recent.append(bound)
+	except:
+		pass
 
 # Add a date column, so as to be compatible with historical
 recent['date'] = recent['end_time'].astype('datetime64[ns]')
@@ -212,7 +234,7 @@ historical = historical[(historical['date'] < recent['date'].min()) | (historica
 historical = historical.append(recent)
 
 # Clean up columns
-historical = historical[['date', 'end_time', 'key', 'name', 'value']]
+historical = historical[['date', 'end_time', 'key', 'sub_key', 'name', 'value']]
 
 # Over-write the historical csv
-historical.to_csv('../data/historical.csv')
+historical.to_csv('../data/historical.csv', index = False)
