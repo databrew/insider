@@ -1,11 +1,15 @@
 ---
 title: "INSIDER-facebook performance dashboard"
 params:
-  get_new_data: False
+  get_new_data: True
 output: flexdashboard::flex_dashboard
 ---
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE, cache = FALSE}
+
+# If get_new_data is set to True,
+# make sure that you are working within the "insider" virtualenv
+
 # Libraries
 library(tidyverse)
 library(knitr)
@@ -14,6 +18,7 @@ library(Hmisc)
 library(RColorBrewer)
 library(plotly)
 library(databrew)
+library(ggmap)
 
 # Turn off scientific notation
 options(scipen = '999')
@@ -43,6 +48,30 @@ df <- read_csv('../data/historical.csv')
 # Re-format the date
 df$date <- as.Date(df$date)
 
+# Get all locations
+if('locations.csv' %in% dir()){
+  locations <- read_csv('locations.csv')
+} else {
+  locations <- df %>%
+    filter(key == "page_storytellers_by_city") %>%
+    group_by(sub_key) %>%
+    tally
+  # Geocode
+  gc <- ggmap::geocode(location = locations$sub_key,
+                       output = c('latlon'))
+  locations <- cbind(locations, gc) %>%
+    dplyr::select(-n)
+  # Save csv
+  write_csv(locations, 'locations.csv')
+}
+
+# Join those locations to df
+df <- left_join(x = df,
+                y = locations,
+                by = 'sub_key')
+```
+
+```{r}
 # Ensure that only the most recent of each category is in the data
 df <- 
   df %>%
