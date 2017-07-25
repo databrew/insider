@@ -1,7 +1,7 @@
 ---
 title: "INSIDER-facebook performance dashboard"
 params:
-  get_new_data: True
+  get_new_data: False
 output: flexdashboard::flex_dashboard
 ---
 
@@ -70,6 +70,7 @@ df <- left_join(x = df,
                 y = locations,
                 by = 'sub_key')
 ```
+
 
 ```{r}
 # Ensure that only the most recent of each category is in the data
