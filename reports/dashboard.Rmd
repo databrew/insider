@@ -81,7 +81,7 @@ df <-
   mutate(keep = end_time == max(end_time, na.rm = TRUE)) %>%
   ungroup %>%
   filter(keep) %>%
-  dplyr::select(date, end_time, key, sub_key, name, value)
+  dplyr::select(date, end_time, key, sub_key, name, value, lon, lat)
 
 # Remove any duplicates
 df <- 
