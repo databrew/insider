@@ -1,7 +1,7 @@
 ---
 title: "INSIDER-facebook performance dashboard"
 params:
-  get_new_data: True
+  get_new_data: False
 output: flexdashboard::flex_dashboard
 ---
 
@@ -19,6 +19,7 @@ library(RColorBrewer)
 library(plotly)
 library(databrew)
 library(ggmap)
+library(rworldmap)
 
 # Turn off scientific notation
 options(scipen = '999')
@@ -80,13 +81,13 @@ df <-
   mutate(keep = end_time == max(end_time, na.rm = TRUE)) %>%
   ungroup %>%
   filter(keep) %>%
-  dplyr::select(date, end_time, key, name, value)
+  dplyr::select(date, end_time, key, sub_key, name, value)
 
 # Remove any duplicates
 df <- 
   df %>%
   arrange(end_time) %>%
-  group_by(key, name, date) %>%
+  group_by(key, sub_key, name, date) %>%
   mutate(n = n()) %>%
   filter(n == 1) %>%
   ungroup %>%
@@ -108,7 +109,7 @@ df$x <- NULL
 df <- 
   df %>%
   arrange(date) %>%
-  group_by(key, name) %>%
+  group_by(key, sub_key, name) %>%
   mutate(value_cum = cum_summer(value))
 ```
 
@@ -133,13 +134,13 @@ plot_data <-
   group_by(name, key) %>%
   filter(date == max(date)) %>%
   group_by(name) %>%
-  summarise(page_views = dplyr::first(value[key == 'page_views']),
-            fan_adds = dplyr::first(value[key == 'fan_adds'])) %>%
+  summarise(page_views = sum(value[key == 'page_views']),
+            page_fan_adds = sum(value[key == 'page_fan_adds'])) %>%
   ungroup
 
 g <- ggplot(data = plot_data,
        aes(x = page_views,
-           y = fan_adds,
+           y = page_fan_adds,
            label = name)) +
   geom_point(alpha = 0.6,
              color = 'darkorange',
@@ -154,12 +155,15 @@ ggplotly(g, tootip = 'name')
 ```
  
 
-### View to fan adds over time
+### Views to fan adds over time
 
 ```{r}
 cols <- c('blue', 'darkorange')
-ggplot(data = df %>%
-         filter(key != 'fan_count'),
+plot_data <- df %>%
+  filter(key %in% c('page_fan_adds', 'page_views')) %>%
+  group_by(name, date, key) %>%
+  summarise(value_cum = sum(value_cum, na.rm = TRUE))
+ggplot(data = plot_data,
        aes(x = date,
            y = value_cum,
            color = key)) +
@@ -183,7 +187,7 @@ Column {.tabset}
 ### Fan adds
 
 ```{r}
-time_chart(the_key = 'fan_adds') +
+time_chart(the_key = 'page_fan_adds') +
   theme_databrew()
 ```   
 
@@ -216,8 +220,9 @@ Row {data-height=700}
 ### Data explorer
 
 ```{r}
-DT::datatable(df %>%
-                dplyr::select(date, key, name, value, value_cum))
+# filtering down so that it's not too much data / too slow
+DT::datatable(df[1:1000,] %>%
+                dplyr::select(date, key, sub_key, name, value, value_cum))
 ```   
     
 ### Overall views over time
@@ -225,8 +230,8 @@ DT::datatable(df %>%
 ```{r}
 x <- df %>%
   ungroup %>%
-  filter(key != 'fan_count') %>%
-  mutate(key = ifelse(key == 'fan_adds', 'Fan adds', 'Page views')) %>%
+  filter(key %in% c('page_fan_adds', 'page_views')) %>%
+  mutate(key = ifelse(key == 'page_fan_adds', 'Fan adds', 'Page views')) %>%
   group_by(date, key) %>%
   summarise(n = sum(value_cum))
 cols <- c('blue', 'darkorange')
@@ -260,6 +265,44 @@ barplot(1:10)
 ```
 
 ### Yesterday's likes
+
+```{r}
+barplot(1:10)
+```
+
+
+Geography
+=====================================  
+    
+   
+Column {.tabset}
+-------------------------------------
+   
+
+### By city
+
+```{r}
+library(rworldmap)
+world <- map_data(map="world")
+cities <- df %>%
+  filter(key == 'page_storytellers_by_city') %>%
+  group_by(sub_key, lon, lat) %>%
+  summarise(value = sum(value, na.rm = TRUE))
+ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat,
+                                 group = group)) +
+  geom_point(data = cities,
+             aes(x = lon,
+                 y = lat,
+                 size = value),
+             col = 'red',
+             alpha = 0.2) +
+  theme_databrew() +
+  theme(legend.position="none") +
+  labs(x = '', y = '')
+```
+
+### By country
 
 ```{r}
 barplot(1:10)
