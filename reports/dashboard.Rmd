@@ -115,8 +115,7 @@ df <-
 ```
 
 
- 
-Home
+Yesterday
 =====================================  
     
    
@@ -124,12 +123,50 @@ Column {.tabset}
 -------------------------------------
    
 
-### Views to fan adds correlation
+### Yesterday's views
 
-The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys).
+```{r}
+# this is for most recent day
+x <- 
+  df %>%
+  filter(!is.na(value)) %>%
+  group_by(name, key) %>%
+  filter(date == max(date)) %>%
+  group_by(name) %>%
+  summarise(page_views = dplyr::first(value[key == 'page_views']),
+            fan_adds = dplyr::first(value[key == 'page_fan_adds'])) %>%
+  ungroup
+
+p <- ggplot(x, aes(name, page_views)) + 
+     geom_bar(stat = 'identity', fill = 'darkorange', colour = 'blue', alpha = 0.7) + 
+     ggtitle("Yesterday's views by channel") + 
+     theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+
+p
+```
+
+### Yesterday's likes
+
+```{r}
+p <- ggplot(x, aes(name, fan_adds)) + 
+  geom_bar(stat = 'identity', fill = 'darkorange', colour = 'blue', alpha = 0.7) + 
+  ggtitle("Yesterday's likes by channel") + 
+  theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+
+p
+```
+   
+
+Column {.tabset}
+-------------------------------------
+   
+
+### Yesterday's views to fan adds correlation
+
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
     
 ```{r}
-plot_data <- 
+x <- 
   df %>%
   filter(!is.na(value)) %>%
   group_by(name, key) %>%
@@ -139,7 +176,7 @@ plot_data <-
             page_fan_adds = sum(value[key == 'page_fan_adds'])) %>%
   ungroup
 
-g <- ggplot(data = plot_data,
+g <- ggplot(data = x,
        aes(x = page_views,
            y = page_fan_adds,
            label = name)) +
@@ -148,44 +185,54 @@ g <- ggplot(data = plot_data,
              size = 4) +
   labs(x = 'Page views',
        y = 'Fan adds',
-       title = 'Exposure-quality association',
-       subtitle = 'Some channels inspire views; others inspire likes') +
+        title = "Yesterday's",
+       subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
 ggplotly(g, tootip = 'name')
 ```
- 
 
-### Views to fan adds over time
+### Avg views to fan adds correlation
 
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
+    
 ```{r}
-cols <- c('blue', 'darkorange')
-plot_data <- df %>%
-  filter(key %in% c('page_fan_adds', 'page_views')) %>%
-  group_by(name, date, key) %>%
-  summarise(value_cum = sum(value_cum, na.rm = TRUE))
-ggplot(data = plot_data,
-       aes(x = date,
-           y = value_cum,
-           color = key)) +
-  geom_line(alpha = 0.7,
-            size = 2) +
-  facet_wrap(~name) +
-  theme_databrew(base_size = 13) +
-  labs(x = 'Date',
-       y = '',
-       title = 'Page views and fan adds over time',
-       subtitle = 'Different trajectories suggest different market use') +
-  theme(axis.text.x = element_text(angle = 90)) +
-  scale_color_manual(name = '',
-                     values = cols)
-  
+x_2017 <- 
+  df %>%
+  filter(!is.na(value)) %>%
+  group_by(name, key) %>%
+  filter(date != max(date)) %>%
+  filter(date  > '2016-12-31') %>%
+  group_by(name) %>%
+  summarise(page_views = round(mean(value[key == 'page_views']), 2),
+            page_fan_adds = round(mean(value[key == 'page_fan_adds']), 2)) %>%
+  ungroup
+
+g <- ggplot(data = x_2017,
+       aes(x = page_views,
+           y = page_fan_adds,
+           label = name)) +
+  geom_point(alpha = 0.6,
+             color = 'darkorange',
+             size = 4) +
+  labs(x = 'Page views',
+       y = 'Fan adds',
+       title = '2017 Avg',
+       subtitle = 'Likes vs Views') +
+  theme_databrew() +
+  geom_smooth(method = 'lm', se = FALSE)
+ggplotly(g, tootip = 'name')
 ```
+
+Cumulative
+=====================================  
+    
    
 Column {.tabset}
 -------------------------------------
    
-### Fan adds
+   
+### Cumulative fan adds 
 
 ```{r}
 time_chart(the_key = 'page_fan_adds') +
@@ -193,16 +240,42 @@ time_chart(the_key = 'page_fan_adds') +
 ```   
 
     
-### Page views
+### Cumulative page views
     
 ```{r}
 time_chart(the_key = 'page_views') +
   theme_databrew()
 ```
 
-    
+ 
+   
+Column {.tabset}
+-------------------------------------
 
+### views and fan adds over time
 
+```{r}
+x <- df %>%
+  ungroup %>%
+  filter(key %in% c('page_fan_adds', 'page_views')) %>%
+  mutate(key = ifelse(key == 'page_fan_adds', 'Fan adds', 'Page views')) %>%
+  group_by(date, key) %>%
+  summarise(n = sum(value_cum))
+cols <- c('blue', 'darkorange')
+
+ggplot(data = x,
+       aes(x = date,
+           y = n)) +
+  geom_line(aes(color = key),
+            alpha = 0.6,
+            size = 1.5) +
+  theme_databrew() +
+  labs(x = 'Date',
+       y = 'Value',
+       title = 'All 16 pages') +
+  scale_color_manual(name = '',
+                     values = cols)
+```
 
 
 Data {data-orientation=rows}
@@ -226,54 +299,52 @@ DT::datatable(df[1:1000,] %>%
                 dplyr::select(date, key, sub_key, name, value, value_cum))
 ```   
     
-### Overall views over time
-
-```{r}
-x <- df %>%
-  ungroup %>%
-  filter(key %in% c('page_fan_adds', 'page_views')) %>%
-  mutate(key = ifelse(key == 'page_fan_adds', 'Fan adds', 'Page views')) %>%
-  group_by(date, key) %>%
-  summarise(n = sum(value_cum))
-cols <- c('blue', 'darkorange')
-
-ggplot(data = x,
-       aes(x = date,
-           y = n)) +
-  geom_line(aes(color = key),
-            alpha = 0.6) +
-  theme_databrew() +
-  labs(x = 'Date',
-       y = 'Value',
-       title = 'Aggregated impact: all 16 pages') +
-  scale_color_manual(name = '',
-                     values = cols)
-```
 
 
-Yesterday
+Insights
 =====================================  
     
-   
 Column {.tabset}
 -------------------------------------
-   
 
-### Yesterday's views
+### Positive and Negative Feedback
 
-```{r}
-barplot(1:10)
-```
-
-### Yesterday's likes
+Postive feedback is... 
+Negative feedback is defined ...
 
 ```{r}
-barplot(1:10)
-```
+ x <- 
+    df %>%
+    filter(!is.na(value)) %>%
+    group_by(name, key) %>%
+    filter(date  > '2016-12-31') %>%
+    group_by(name) %>%
+    summarise(num_pos = round(mean(value[key == 'page_positive_feedback_by_type']), 2),
+              num_neg = round(mean(value[key == 'page_negative_feedback']), 2)) %>%
+    ungroup
 
 
-Geography
-=====================================  
+
+
+```   
+
+
+### Storytellers by gender
+
+```{r}
+
+# get data for sub key analysis
+x_2017 <- 
+    df %>%
+    filter(!is.na(value)) %>%
+    group_by(name, key, sub_key) %>%
+    filter(date  > '2016-12-31') %>%
+    group_by(name, key, sub_key) %>%
+    summarise(counts = n())
+
+
+
+```  
     
    
 Column {.tabset}

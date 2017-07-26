@@ -62,7 +62,7 @@ time_chart <-
                 aes(x = date,
                     y = value_cum,
                     color =  name)) +
-      geom_line() +
+      geom_line(size = 1.5) +
       scale_color_manual(name = '',
                          values = cols) +
       guides(color=guide_legend(ncol=4)) +
