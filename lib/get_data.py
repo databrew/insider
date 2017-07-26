@@ -137,6 +137,8 @@ else:
 		# Get page_storytellers_by_age_gender
 		print '--- Getting page_storytellers_by_age_gender for' + this_page
 		page_storytellers_by_age_gender = get_page_metric_all(name = this_page, metric = "page_storytellers_by_age_gender")
+		print '--- Getting page_positive_feedback_by_type for' + this_page
+		page_positive_feedback_by_type = get_page_metric_all(name = this_page, metric = "page_positive_feedback_by_type")
 		# Bind together everything
 		bound = page_views_all.append(fan_adds_all)
 		bound = bound.append(negative_feedback_all)
@@ -144,6 +146,7 @@ else:
 		bound = bound.append(page_storytellers_by_city)
 		bound = bound.append(page_video_views)
 		bound = bound.append(page_storytellers_by_age_gender)
+		bound = bound.append(page_positive_feedback_by_type)
 		# Bind those dataframes to the master one
 		try:
 			print '--- Combining data from ' + this_page + ' with other pages'
@@ -208,7 +211,9 @@ for i in range(0, len(facebook_pages)):
 	# Get page_video_views
 	print '--- Getting page_storytellers_by_age_gender for ' + this_page
 	page_storytellers_by_age_gender = get_page_metric_date_range(name = this_page, metric = "page_storytellers_by_age_gender", start = recent_start_f, stop = recent_stop_f)
-
+	# Get page_positive_feedback_by_type
+	print '--- Getting page_positive_feedback_by_type for ' + this_page
+	page_positive_feedback_by_type = get_page_metric_date_range(name = this_page, metric = "page_positive_feedback_by_type", start = recent_start_f, stop = recent_stop_f)
 	# Bind the dataframes
 	bound = page_views_recent.append(fan_adds_recent)
 	bound = bound.append(likes_now)
@@ -217,6 +222,7 @@ for i in range(0, len(facebook_pages)):
 	bound = bound.append(page_storytellers_by_city)
 	bound = bound.append(page_video_views)
 	bound = bound.append(page_storytellers_by_age_gender)
+	bound = bound.append(page_positive_feedback_by_type)
 	# Bind those dataframes to the master one
 	try:
 		print '--- Combining data from ' + this_page + ' with other pages'
