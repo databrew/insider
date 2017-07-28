@@ -22,6 +22,7 @@ library(databrew)
 library(ggmap)
 library(rworldmap)
 library(reshape2)
+library(googlesheets)
 
 # Turn off scientific notation
 options(scipen = '999')
@@ -116,8 +117,41 @@ df <-
   mutate(value_cum = cum_summer(value))
 ```
 
+```{r, eval = FALSE}
+# Having now retrieved and cleaned the most recent data,
+# time to upload the most recent data to google sheets
+setwd('../credentials/')
 
-Yesterday views and likes
+# Identify the sheet
+this_sheet <- gs_ls("databrew-insider raw data")
+
+# Register the sheet
+this_sheet_registered <- gs_key(x = this_sheet$sheet_key)
+
+# Define todays data
+todays_data <- df %>%
+  ungroup %>%
+            filter(date == max(date, na.rm = TRUE)) %>%
+  dplyr::select(-end_time, -sub_key, -lon, -lat) %>%
+  filter(key %in% c('page_fan_adds',
+                    'page_video_views'))
+
+
+# Write a csv of just today's data
+# write_csv(todays_data, '../reports/google/insider_raw_data.csv')
+# gs_upload(file = '../reports/google/insider_raw_data.csv',
+#           overwrite = FALSE)
+gs_edit_cells(ss = this_sheet_registered,
+              ws = 1,
+              input = todays_data,
+              anchor = 'A1',
+              col_names = TRUE,
+              trim = TRUE)
+setwd('../reports/')
+```
+
+
+Yesterday
 =====================================  
     
    
@@ -142,7 +176,8 @@ x <-
 p <- ggplot(x, aes(name, page_views)) + 
      geom_bar(stat = 'identity', fill = 'darkorange', colour = 'blue', alpha = 0.7) + 
      ggtitle("Yesterday's views by channel") + 
-     theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+     theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  labs(x = 'Channel', y = 'Page views')
 
 p
 ```
@@ -153,7 +188,8 @@ p
 p <- ggplot(x, aes(name, fan_adds)) + 
   geom_bar(stat = 'identity', fill = 'darkorange', colour = 'blue', alpha = 0.7) + 
   ggtitle("Yesterday's likes by channel") + 
-  theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) 
+  theme_databrew() + theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+  labs(x = 'Channel', y = 'Page views')
 
 p
 ```
@@ -187,7 +223,7 @@ g <- ggplot(data = x,
              size = 4) +
   labs(x = 'Page views',
        y = 'Fan adds',
-        title = "Yesterday's",
+        title = "Views to fan adds",
        subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
@@ -226,7 +262,7 @@ g <- ggplot(data = x_2017,
 ggplotly(g, tootip = 'name')
 ```
 
-Cumulative views and likes
+All time
 =====================================  
     
    
@@ -254,7 +290,7 @@ time_chart(the_key = 'page_views') +
 Column {.tabset}
 -------------------------------------
 
-### views and fan adds over time
+### Views and fan adds over time
 
 ```{r}
 x <- df %>%
@@ -277,6 +313,42 @@ ggplot(data = x,
        title = 'All 16 pages') +
   scale_color_manual(name = '',
                      values = cols)
+```
+
+
+### Time standardization
+
+```{r}
+x <- df %>%
+  ungroup %>%
+  filter(key %in% c('page_fan_adds', 'page_views')) %>%
+  mutate(key = ifelse(key == 'page_fan_adds', 'Fan adds', 'Page views')) %>%
+  group_by(name) %>%
+  mutate(start_date = dplyr::first(date[value_cum > 0])) %>%
+  ungroup %>%
+  mutate(days = as.numeric(date - start_date)) %>%
+  filter(days >= 0) %>%
+  group_by(days,name, key) %>%
+  summarise(n = sum(value_cum))
+cols <- colorRampPalette(brewer.pal(n = 9,
+                                    name = 'Spectral'))(length(unique(x$name)))
+g <- ggplot(data = x,
+       aes(x = days,
+           y = n,
+           group = name,
+           color = name)) +
+  geom_line(alpha = 0.8,
+            size = 0.5) +
+  theme_databrew() +
+  labs(x = 'Days',
+       y = 'Value',
+       title = 'Time standardization',
+       subtitle = 'Days since start') +
+  scale_color_manual(name = '',
+                     values = cols) +
+  facet_grid(~key) +
+  theme(legend.position = 'none')
+ggplotly(g)
 ```
 
 
@@ -391,7 +463,6 @@ Column {.tabset}
 
 ### Storytellers By city (All data)
 
-The number of people sharing stories about your page broken down by city. 
 
 ```{r}
 
@@ -415,6 +486,36 @@ ggplot() +
 ```
 
 
+
+### Storytellers By city (by page)
+
+
+```{r}
+
+world <- map_data(map="world")
+cities <- df %>%
+  filter(key == 'page_storytellers_by_city') %>%
+  group_by(sub_key, name, lon, lat) %>%
+  summarise(value = sum(value, na.rm = TRUE))
+ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat,
+                                 group = group)) +
+  geom_point(data = cities,
+             aes(x = lon,
+                 y = lat,
+                 size = value,
+                 color = name),
+             # col = 'red',
+             alpha = 0.2) +
+  theme_databrew() +
+  theme(legend.position="none") +
+  labs(x = '', y = '') +
+  facet_wrap(~name) +
+  ggthemes::theme_map() +
+  theme(legend.position = 'none')
+```
+
+
 User feedback
 =====================================  
     
@@ -422,6 +523,12 @@ Column {.tabset}
 -------------------------------------
 
 ### Positive feedback by type (2017)
+
+The postive feedback value is defined by the number of people who took a positive action - like, comment, share, answer question, claim an offer and respond to an event. 
+The negative feedback value is defined by the number of people who hide a story, posts from a page, report an object as spam, or unlike a page. 
+
+
+
 
 ```{r}
 # use x_2017
@@ -469,8 +576,6 @@ p
 
 ### Positive and Negative Feedback (2017)
 
-The postive feedback value is defined by the number of people who took a positive action - like, comment, share, answer question, claim an offer and respond to an event. 
-The negative feedback value is defined by the number of people who hide a story, posts from a page, report an object as spam, or unlike a page. 
 
 ```{r}
 
@@ -494,7 +599,7 @@ p <- ggplot(x_melt, aes(name, value, group = variable, fill = variable)) +
   ylab('Daily Avg') +
   scale_fill_manual(name = '', 
                     breaks = c('num_pos', 'num_neg'),
-                    labels = c('Negative Feedback', 'Positive Feedback'),
+                    labels = c('Positive Feedback', 'Negative Feedback'),
                     values = c('darkorange', 'blue')) + ggtitle("2017 Daily Avg") + 
   theme_databrew() + 
   theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position = 'right') 
@@ -502,7 +607,6 @@ p <- ggplot(x_melt, aes(name, value, group = variable, fill = variable)) +
 p
 
 ```
-
 
 
 Column {.tabset}
@@ -521,21 +625,19 @@ starter <- min(x$date[x$value_cum > 0], na.rm = TRUE)
 
 x <- x %>%
   filter(date >= starter)
-
-
-
 ```
 
 ### Art
 
 ```{r}
-page = 'Art'
-div = 1000000
-
-
+simple_chart <- function(page = 'Art',
+                         div = 1000000){
+  
 # get data
 x_sub <- x %>%
-        filter(name == page)
+  arrange(date) %>%
+        filter(name == page) %>%
+  filter(date >= dplyr::first(date[value_cum > 0]))
 
 p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
   geom_line(size = 1.5, alpha = 0.7) +
@@ -547,6 +649,11 @@ p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
                     values = c('darkorange', 'blue')) +
   ggtitle("2015-2017 Comments and Likes") + theme_databrew()
 p
+}
+
+page = 'Art'
+div = 1000000
+simple_chart(page = page, div = div)
 
 ```
 
@@ -555,23 +662,7 @@ p
 ```{r}
 page = 'Beauty'
 div = 1000000
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Cheese
@@ -579,24 +670,7 @@ p
 ```{r}
 page = 'Cheese'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Design
@@ -604,24 +678,7 @@ p
 ```{r}
 page = 'Design'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Dessert
@@ -629,23 +686,7 @@ p
 ```{r}
 page = 'Dessert'
 div = 1000000
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Fitness
@@ -653,23 +694,7 @@ p
 ```{r}
 page = 'Fitness'
 div = 1000000
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Food
@@ -677,24 +702,7 @@ p
 ```{r}
 page = 'Food'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('Millions') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Home
@@ -702,23 +710,7 @@ p
 ```{r}
 page = 'Home'
 div = 1000000
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Inventions
@@ -726,24 +718,7 @@ p
 ```{r}
 page = 'Inventions'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Kitchen
@@ -751,24 +726,7 @@ p
 ```{r}
 page = 'Kitchen'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('Millions') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Popculture
@@ -776,23 +734,7 @@ p
 ```{r}
 page = 'Popculture'
 div =1000000
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('Millions') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-
+simple_chart(page = page, div = div)
 ```
 
 ### Science 
@@ -800,24 +742,7 @@ p
 ```{r}
 page = 'Science'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-
-p
+simple_chart(page = page, div = div)
 
 ```
 
@@ -826,23 +751,7 @@ p
 ```{r}
 page = 'Style'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
+simple_chart(page = page, div = div)
 
 ```
 
@@ -851,23 +760,7 @@ p
 ```{r}
 page = 'Thisisinsider'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
+simple_chart(page = page, div = div)
 
 ```
 
@@ -876,23 +769,7 @@ p
 ```{r}
 page = 'Travel'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
+simple_chart(page = page, div = div)
 
 ```
 
@@ -901,29 +778,9 @@ p
 ```{r}
 page = 'Video'
 div = 1000000
-
-
-# get data
-x_sub <- x %>%
-        filter(name == page)
-
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
+simple_chart(page = page, div = div)
 
 ```
-
-
-
-
 
 
 Data {data-orientation=rows}
@@ -934,7 +791,10 @@ Row {data-height=300}
 
 ### Data repository
 
-Soon a link to a stable repository for data (google docs, for example) will be placed here.
+The dashboard automatically stores several types of data:
+- A raw data snapshot for retrieval, archiving, and backups.
+- A master dataset for analysis by data scientists.
+- A daily google spreadsheet update for analysts: https://docs.google.com/spreadsheets/d/1Q7qZqSo_K-2d09xe4SDo5arZxIKd84-l4v4qm-BN0jM/edit#gid=0
 
 Row {data-height=700}
 -------------------------------------

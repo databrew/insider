@@ -1,2 +1,5 @@
 /credentials
 /data
+fb_oauth
+.httr-oauth
+*.html
