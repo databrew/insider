@@ -11,10 +11,6 @@ import numpy as np
 from itertools import chain
 import re
 
-
-import os
-os.chdir('/home/joebrew/Documents/insider/lib')
-
 # For the facebook library, install as follows via terminal:
 # # pip install -e git+https://github.com/mobolic/facebook-sdk.git#egg=facebook-sdk
 import facebook
