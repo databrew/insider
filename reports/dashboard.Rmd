@@ -609,6 +609,36 @@ p
 ```
 
 
+
+### PN ratio
+
+
+```{r}
+# Get positive to negative feedback ratio over tim
+ x <- 
+    df %>%
+      filter(!is.na(value)) %>%
+      group_by(name, date) %>%
+      summarise(num_pos = round(mean(value[key == 'page_positive_feedback_by_type']), 2),
+                num_neg = round(mean(value[key == 'page_negative_feedback']), 2)) %>%
+      ungroup %>%
+  mutate(ratio = num_pos / num_neg)
+
+# melt data
+
+p <- ggplot(x, aes(x = date, group = name, y = ratio, color = name)) + 
+  # geom_line(alpha = 0.7) + 
+  geom_smooth(se = FALSE) +
+  xlab('Page') +
+  ylab('Ratio') +
+  labs(title = 'Ratio of positive to negative interactions') +
+  theme_databrew() + 
+  theme(legend.position = 'none') 
+ggplotly(p)
+
+```
+
+
 Column {.tabset}
 -------------------------------------
 ```{r}
