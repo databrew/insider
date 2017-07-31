@@ -3,9 +3,12 @@ title: "INSIDER-facebook performance dashboard"
 params:
   get_new_data: False
 output: flexdashboard::flex_dashboard
+keep_tex: True
 ---
 
-```{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE, cache = FALSE}
+```{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE}
+###{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE, cache = FALSE}
+
 
 # If get_new_data is set to True,
 # make sure that you are working within the "insider" virtualenv
@@ -201,7 +204,7 @@ Column {.tabset}
 
 ### Yesterday's views to fan adds correlation
 
-The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passers-by). 
     
 ```{r}
 x <- 
@@ -227,7 +230,9 @@ g <- ggplot(data = x,
        subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
-ggplotly(g, tootip = 'name')
+ggplotly(g, tootip = 'name') %>%
+    layout(autosize = F, width = 550, height = 390)
+
 ```
 
 ### Avg views to fan adds correlation
@@ -235,6 +240,7 @@ ggplotly(g, tootip = 'name')
 The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
     
 ```{r}
+
 x_2017 <- 
   df %>%
   filter(!is.na(value)) %>%
@@ -259,7 +265,8 @@ g <- ggplot(data = x_2017,
        subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
-ggplotly(g, tootip = 'name')
+ggplotly(g, tootip = 'name') %>%
+    layout(autosize = F, width = 550, height = 390)
 ```
 
 All time
@@ -273,16 +280,20 @@ Column {.tabset}
 ### Cumulative fan adds 
 
 ```{r}
-time_chart(the_key = 'page_fan_adds') +
-  theme_databrew()
+p <- time_chart(the_key = 'page_fan_adds', div = 1000000) + theme_databrew() + theme(legend.position="none") 
+
+ggplotly(p, tooltip = c('value_cum/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```   
 
     
 ### Cumulative page views
     
 ```{r}
-time_chart(the_key = 'page_views') +
-  theme_databrew()
+p <- time_chart(the_key = 'page_views', div = 1000000) + theme_databrew() + theme(legend.position="none") 
+
+ggplotly(p, tooltip = c('value_cum/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```
 
  
@@ -301,18 +312,26 @@ x <- df %>%
   summarise(n = sum(value_cum))
 cols <- c('blue', 'darkorange')
 
-ggplot(data = x,
+div = 1000000
+
+p <- ggplot(data = x,
        aes(x = date,
-           y = n)) +
+           y = n/div)) +
   geom_line(aes(color = key),
             alpha = 0.6,
             size = 1.5) +
   theme_databrew() +
   labs(x = 'Date',
-       y = 'Value',
+       y = 'Value (millions)',
        title = 'All 16 pages') +
-  scale_color_manual(name = '',
-                     values = cols)
+      scale_color_manual(values= c('darkorange','blue')) + 
+      theme(legend.position = 'none')
+
+
+
+ggplotly(p,  tooltip = c('key', 'n/div')) %>%
+    layout(autosize = F, width = 550, height = 500)
+  
 ```
 
 
@@ -332,23 +351,28 @@ x <- df %>%
   summarise(n = sum(value_cum))
 cols <- colorRampPalette(brewer.pal(n = 9,
                                     name = 'Spectral'))(length(unique(x$name)))
+
+div <- 1000000
+
 g <- ggplot(data = x,
        aes(x = days,
-           y = n,
+           y = n/div,
            group = name,
            color = name)) +
   geom_line(alpha = 0.8,
-            size = 0.5) +
+            size = 1.1) +
   theme_databrew() +
   labs(x = 'Days',
-       y = 'Value',
+       y = 'Value (millions)',
        title = 'Time standardization',
        subtitle = 'Days since start') +
   scale_color_manual(name = '',
                      values = cols) +
   facet_grid(~key) +
   theme(legend.position = 'none')
-ggplotly(g)
+
+ggplotly(g,  tooltip = c('days', 'n/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```
 
 
@@ -400,10 +424,10 @@ x_melt$gen <- ifelse(grepl('f', x_melt$variable), 'Female', 'Male' )
 # get new age variable - 13, 18, 25, 35, etc
 x_melt$age <- ifelse(grepl('13', x_melt$variable), '13_17', 
                      ifelse(grepl('18', x_melt$variable), '18_24',
-                            ifelse(grepl('25', x_melt$variable), '25-34',
+                            ifelse(grepl('25', x_melt$variable), '25_34',
                                    ifelse(grepl('35', x_melt$variable), '35_44',
-                                          ifelse(grepl('45', x_melt$variable), '45-54',
-                                                 ifelse(grepl('55', x_melt$variable), '55-64', '65_over'))))))
+                                          ifelse(grepl('45', x_melt$variable), '45_54',
+                                                 ifelse(grepl('55', x_melt$variable), '55_64', '65_over'))))))
 
 # remove variable
 x_melt$variable <- NULL
@@ -415,12 +439,14 @@ x_age <- x_melt %>%
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00")
 
-p <- ggplot(x_age, aes(name, daily_avg, group = age, fill = age)) + 
+div <- 1000
+
+p <- ggplot(x_age, aes(name, daily_avg/div, group = age, fill = age)) + 
   geom_bar(stat = 'identity', alpha = 0.7) + 
   xlab('Page') +
-  ylab('Stories told') +
+  ylab('Stories told (thousand)') +
   scale_fill_manual(name = '', 
-                    breaks = c('13_17', '18_24', '25_34', '35_44', '45_54', '55-64', '65_over'),
+                    breaks = c('13_17', '18_24', '25_34', '35_44', '45_54', '55_64', '65_over'),
                     labels = c('13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65-over'),
                     values = cbPalette)+ 
   ggtitle("2017 Daily Avg") +
@@ -442,10 +468,12 @@ x_gen <- x_melt %>%
   group_by(name, gen) %>%
   summarise(daily_avg = sum(value))
 
-p <- ggplot(x_gen, aes(name, daily_avg, group = gen, fill = gen)) + 
-  geom_bar(stat = 'identity', position = 'dodge', alpha = 0.7) + 
+div <- 1000
+
+p <- ggplot(x_gen, aes(name, daily_avg/div, group = gen, fill = gen)) + 
+  geom_bar(stat = 'identity', alpha = 0.7) + 
   xlab('Page') +
-  ylab('Stories told') +
+  ylab('Stories told (thousand)') +
   scale_fill_manual(name = '', 
                     values = c('blue', 'darkorange')) + ggtitle("Story tellers in 2017") + 
   theme_databrew() + 
@@ -467,67 +495,171 @@ Column {.tabset}
 ```{r}
 
 world <- map_data(map="world")
-cities <- df %>%
-  filter(key == 'page_storytellers_by_city') %>%
-  group_by(sub_key, lon, lat) %>%
-  summarise(value = sum(value, na.rm = TRUE))
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat,
-                                 group = group)) +
-  geom_point(data = cities,
-             aes(x = lon,
-                 y = lat,
-                 size = value),
-             col = 'red',
-             alpha = 0.2) +
-  theme_databrew() +
-  theme(legend.position="none") +
-  labs(x = '', y = '')
-```
 
-
-
-### Storytellers By city (by page)
-
-
-```{r}
-
-world <- map_data(map="world")
 cities <- df %>%
   filter(key == 'page_storytellers_by_city') %>%
   group_by(sub_key, name, lon, lat) %>%
   summarise(value = sum(value, na.rm = TRUE))
-ggplot() +
-  geom_polygon(data = world, aes(x = long, y = lat,
-                                 group = group)) +
-  geom_point(data = cities,
-             aes(x = lon,
-                 y = lat,
-                 size = value,
-                 color = name),
-             # col = 'red',
-             alpha = 0.2) +
-  theme_databrew() +
-  theme(legend.position="none") +
-  labs(x = '', y = '') +
-  facet_wrap(~name) +
-  ggthemes::theme_map() +
-  theme(legend.position = 'none')
+
+map_city(page = 'all')
+
+```
+
+
+
+### Art
+
+```{r}
+page = 'Art'
+
+map_city(page)
+
+```
+### Beauty
+
+```{r}
+page = 'Beauty'
+
+map_city(page)
+
+```
+
+### Cheese
+
+```{r}
+page = 'Cheese'
+
+map_city(page)
+
+```
+
+### Design
+
+```{r}
+page = 'Design'
+
+map_city(page)
+
+```
+
+### Dessert
+
+```{r}
+page = 'Dessert'
+
+map_city(page)
+
+```
+
+### Fitness
+
+```{r}
+page = 'Fitness'
+
+map_city(page)
+
+```
+
+### Food
+
+```{r}
+page = 'Food'
+
+map_city(page)
+
+```
+
+### Home
+
+```{r}
+page = 'Home'
+
+map_city(page)
+
+```
+
+### Inventions
+
+```{r}
+page = 'Inventions'
+
+map_city(page)
+
+```
+
+### Kitchen
+
+```{r}
+page = 'Kitchen'
+
+map_city(page)
+
+```
+
+### Popculture
+
+```{r}
+page = 'Popculture'
+
+map_city(page)
+
+```
+
+### Science
+
+```{r}
+page = 'Science'
+
+map_city(page)
+
+```
+
+### Style
+
+```{r}
+page = 'Style'
+
+map_city(page)
+
+```
+
+### Thisisinsider
+
+```{r}
+page = 'Thisisinsider'
+
+map_city(page)
+
+```
+
+### Travel
+
+```{r}
+page = 'Travel'
+
+map_city(page)
+
+```
+
+### Video
+
+```{r}
+page = 'Video'
+
+map_city(page)
+
 ```
 
 
 User feedback
 =====================================  
+
     
 Column {.tabset}
 -------------------------------------
 
+
 ### Positive feedback by type (2017)
-
-The postive feedback value is defined by the number of people who took a positive action - like, comment, share, answer question, claim an offer and respond to an event. 
-The negative feedback value is defined by the number of people who hide a story, posts from a page, report an object as spam, or unlike a page. 
-
-
 
 
 ```{r}
@@ -594,12 +726,12 @@ p
 x_melt <- melt(x, id.vars = 'name')
 
 p <- ggplot(x_melt, aes(name, value, group = variable, fill = variable)) + 
-  geom_bar(stat = 'identity', position = 'dodge', alpha = 0.7) + 
+  geom_bar(stat = 'identity', alpha = 0.7) + 
   xlab('Page') +
   ylab('Daily Avg') +
   scale_fill_manual(name = '', 
                     breaks = c('num_pos', 'num_neg'),
-                    labels = c('Positive Feedback', 'Negative Feedback'),
+                    labels = c('Positive', 'Negative'),
                     values = c('darkorange', 'blue')) + ggtitle("2017 Daily Avg") + 
   theme_databrew() + 
   theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position = 'right') 
@@ -624,17 +756,31 @@ p
       ungroup %>%
   mutate(ratio = num_pos / num_neg)
 
-# melt data
+# remove Inf from data
+x <- x[!grepl('Inf', x$ratio),]
+
 
 p <- ggplot(x, aes(x = date, group = name, y = ratio, color = name)) + 
-  # geom_line(alpha = 0.7) + 
-  geom_smooth(se = FALSE) +
+  geom_line(alpha = 0.6) +
+  geom_smooth() +
   xlab('Page') +
   ylab('Ratio') +
   labs(title = 'Ratio of positive to negative interactions') +
   theme_databrew() + 
-  theme(legend.position = 'none') 
-ggplotly(p)
+  theme(legend.position = 'none') + 
+  theme(plot.title = element_text(size = 12), 
+        legend.title=element_text(size=6), 
+        legend.text=element_text(size=6)) +
+  theme(axis.text=element_text(size=6), 
+        axis.title=element_text(size=6), 
+        axis.text.y = element_text(size =8),
+        axis.text.x = element_text(angle = 45, hjust=1, size = 8),
+        strip.text = element_text(size=8)) +
+  facet_wrap( ~ name, ncol = 4, nrow = 4) +
+  theme(strip.background = element_blank(),
+   strip.text.y = element_blank())
+
+p
 
 ```
 
@@ -648,7 +794,7 @@ x <- as.data.frame(x[grepl('like|comment', x$sub_key),])
 
 
 # remove key
-x$key <- x$end_time <- x$lat <- x$lon <- x$value <-  NULL
+x$key <- x$end_time <- x$lat <- x$lon <-  NULL
 
 # get first date where value_cum > 0
 starter <- min(x$date[x$value_cum > 0], na.rm = TRUE)
@@ -657,33 +803,29 @@ x <- x %>%
   filter(date >= starter)
 ```
 
+### All data
+
+```{r}
+
+page = 'all'
+div = 1000000
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
+  
+
+
+```
+
 ### Art
 
 ```{r}
-simple_chart <- function(page = 'Art',
-                         div = 1000000){
-  
-# get data
-x_sub <- x %>%
-  arrange(date) %>%
-        filter(name == page) %>%
-  filter(date >= dplyr::first(date[value_cum > 0]))
-
-p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-  geom_line(size = 1.5, alpha = 0.7) +
-  xlab('Date') +
-  ylab('(Millions)') +
-  scale_colour_manual(name = '',
-                    breaks = c('comment', 'like'),
-                    labels = c('Comments', 'Likes'),
-                    values = c('darkorange', 'blue')) +
-  ggtitle("2015-2017 Comments and Likes") + theme_databrew()
-p
-}
 
 page = 'Art'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -692,7 +834,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Beauty'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Cheese
@@ -700,7 +844,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Cheese'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Design
@@ -708,7 +854,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Design'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Dessert
@@ -716,7 +864,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Dessert'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Fitness
@@ -724,7 +874,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Fitness'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Food
@@ -732,7 +884,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Food'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Home
@@ -740,7 +894,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Home'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Inventions
@@ -748,7 +904,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Inventions'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Kitchen
@@ -756,7 +914,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Kitchen'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Popculture
@@ -764,7 +924,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Popculture'
 div =1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Science 
@@ -772,7 +934,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Science'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -781,7 +945,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Style'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -790,7 +956,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Thisisinsider'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -799,7 +967,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Travel'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -808,7 +978,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Video'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
