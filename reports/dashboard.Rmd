@@ -3,6 +3,7 @@ title: "INSIDER-facebook performance dashboard"
 params:
   get_new_data: False
 output: flexdashboard::flex_dashboard
+keep_tex: True
 ---
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE, comment = NA, error= FALSE}
@@ -203,7 +204,7 @@ Column {.tabset}
 
 ### Yesterday's views to fan adds correlation
 
-The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passers-by). 
     
 ```{r}
 x <- 
@@ -229,7 +230,9 @@ g <- ggplot(data = x,
        subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
-ggplotly(g, tootip = 'name')
+ggplotly(g, tootip = 'name') %>%
+    layout(autosize = F, width = 550, height = 390)
+
 ```
 
 ### Avg views to fan adds correlation
@@ -262,7 +265,8 @@ g <- ggplot(data = x_2017,
        subtitle = 'Likes vs Views') +
   theme_databrew() +
   geom_smooth(method = 'lm', se = FALSE)
-ggplotly(g, tootip = 'name')
+ggplotly(g, tootip = 'name') %>%
+    layout(autosize = F, width = 550, height = 390)
 ```
 
 All time
@@ -276,16 +280,20 @@ Column {.tabset}
 ### Cumulative fan adds 
 
 ```{r}
-time_chart(the_key = 'page_fan_adds', div = 1000000) +
-  theme_databrew()
+p <- time_chart(the_key = 'page_fan_adds', div = 1000000) + theme_databrew() + theme(legend.position="none") 
+
+ggplotly(p, tooltip = c('value_cum/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```   
 
     
 ### Cumulative page views
     
 ```{r}
-time_chart(the_key = 'page_views', div = 1000000) +
-  theme_databrew()
+p <- time_chart(the_key = 'page_views', div = 1000000) + theme_databrew() + theme(legend.position="none") 
+
+ggplotly(p, tooltip = c('value_cum/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```
 
  
@@ -306,7 +314,7 @@ cols <- c('blue', 'darkorange')
 
 div = 1000000
 
-ggplot(data = x,
+p <- ggplot(data = x,
        aes(x = date,
            y = n/div)) +
   geom_line(aes(color = key),
@@ -316,8 +324,14 @@ ggplot(data = x,
   labs(x = 'Date',
        y = 'Value (millions)',
        title = 'All 16 pages') +
-  scale_color_manual(name = '',
-                     values = cols)
+      scale_color_manual(values= c('darkorange','blue')) + 
+      theme(legend.position = 'none')
+
+
+
+ggplotly(p,  tooltip = c('key', 'n/div')) %>%
+    layout(autosize = F, width = 550, height = 500)
+  
 ```
 
 
@@ -357,7 +371,8 @@ g <- ggplot(data = x,
   facet_grid(~key) +
   theme(legend.position = 'none')
 
-ggplotly(g)
+ggplotly(g,  tooltip = c('days', 'n/div', 'name')) %>%
+    layout(autosize = F, width = 550, height = 500)
 ```
 
 
@@ -638,14 +653,14 @@ map_city(page)
 
 User feedback
 =====================================  
+
     
 Column {.tabset}
 -------------------------------------
 
+
 ### Positive feedback by type (2017)
 
-The postive feedback value is defined by the number of people who took a positive action - like, comment, share, answer question, claim an offer and respond to an event. 
-The negative feedback value is defined by the number of people who hide a story, posts from a page, report an object as spam, or unlike a page. 
 
 ```{r}
 # use x_2017
@@ -716,7 +731,7 @@ p <- ggplot(x_melt, aes(name, value, group = variable, fill = variable)) +
   ylab('Daily Avg') +
   scale_fill_manual(name = '', 
                     breaks = c('num_pos', 'num_neg'),
-                    labels = c('Positive Feedback', 'Negative Feedback'),
+                    labels = c('Positive', 'Negative'),
                     values = c('darkorange', 'blue')) + ggtitle("2017 Daily Avg") + 
   theme_databrew() + 
   theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position = 'right') 
@@ -753,13 +768,17 @@ p <- ggplot(x, aes(x = date, group = name, y = ratio, color = name)) +
   labs(title = 'Ratio of positive to negative interactions') +
   theme_databrew() + 
   theme(legend.position = 'none') + 
-  theme(plot.title = element_text(size = 10, face = "bold"), 
-        legend.title=element_text(size=8), 
-        legend.text=element_text(size=8)) +
-  theme(axis.text=element_text(size=8), 
-        axis.title=element_text(size=8,face="bold"), 
-        axis.text.x = element_text(angle = 45, hjust=1)) +
-  facet_wrap( ~ name, ncol = 4, nrow = 4)
+  theme(plot.title = element_text(size = 12), 
+        legend.title=element_text(size=6), 
+        legend.text=element_text(size=6)) +
+  theme(axis.text=element_text(size=6), 
+        axis.title=element_text(size=6), 
+        axis.text.y = element_text(size =8),
+        axis.text.x = element_text(angle = 45, hjust=1, size = 8),
+        strip.text = element_text(size=8)) +
+  facet_wrap( ~ name, ncol = 4, nrow = 4) +
+  theme(strip.background = element_blank(),
+   strip.text.y = element_blank())
 
 p
 
@@ -790,7 +809,11 @@ x <- x %>%
 
 page = 'all'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
+  
+
 
 ```
 
@@ -800,7 +823,9 @@ simple_chart(page = page, div = div)
 
 page = 'Art'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -809,7 +834,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Beauty'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Cheese
@@ -817,7 +844,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Cheese'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Design
@@ -825,7 +854,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Design'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Dessert
@@ -833,7 +864,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Dessert'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Fitness
@@ -841,7 +874,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Fitness'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Food
@@ -849,7 +884,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Food'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Home
@@ -857,7 +894,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Home'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Inventions
@@ -865,7 +904,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Inventions'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Kitchen
@@ -873,7 +914,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Kitchen'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Popculture
@@ -881,7 +924,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Popculture'
 div =1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 ```
 
 ### Science 
@@ -889,7 +934,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Science'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -898,7 +945,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Style'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -907,7 +956,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Thisisinsider'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -916,7 +967,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Travel'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 
@@ -925,7 +978,9 @@ simple_chart(page = page, div = div)
 ```{r}
 page = 'Video'
 div = 1000000
-simple_chart(page = page, div = div)
+p <- simple_chart(page = page, div = div)
+ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+   layout(autosize = F, width = 550, height = 500)
 
 ```
 

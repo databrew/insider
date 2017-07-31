@@ -53,9 +53,9 @@ time_chart <-
     
     # Define labels
     if(the_key == 'page_views'){
-      the_label <- 'page views'
+      the_label <- 'Page Views'
     } else if(the_key == 'page_fan_adds'){
-      the_label <- 'fan adds'
+      the_label <- 'Fan Adds'
     } else stop('Use only page_views or page_fan_adds for the key')
     
     # Define colors
@@ -69,9 +69,8 @@ time_chart <-
       ggtitle(the_label) +
       scale_color_manual(name = '',
                          values = cols) +
-      guides(color=guide_legend(ncol=4)) +
       labs(x = 'Date',
-           y = paste0('Cumulative ', ' (millions)')) 
+           y = paste0('Value ', ' (millions)')) 
     
     return(g)
 }
@@ -129,16 +128,14 @@ simple_chart <- function(page = 'Art',
       filter(date >= dplyr::first(date[value_cum > 0]))
   }
  
-  
   p <- ggplot(x_sub, aes(date, value_cum/div, colour = sub_key)) +
-    geom_line(size = 1.5, alpha = 0.7) +
+    geom_line(size = 1.5, alpha = 0.6) +
     xlab('Date') +
-    ylab('(millions)') +
-    scale_colour_manual(name = '',
-                        breaks = c('comment', 'like'),
-                        labels = c('Comments', 'Likes'),
-                        values = c('darkorange', 'blue')) +
-    ggtitle("2015-2017 Comments and Likes") + theme_databrew()
+    ylab('Value (millions)') +
+    ggtitle("2015-2017 Comments and Likes") + 
+    theme_databrew() +
+    scale_color_manual(values= c('darkorange','blue')) +
+    theme(legend.position = 'none')
   p
 }
 
