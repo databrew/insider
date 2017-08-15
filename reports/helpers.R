@@ -139,3 +139,38 @@ simple_chart <- function(page = 'Art',
   p
 }
 
+# Functionality for generating fake data
+generate_fake_data <- function(df){
+  date <- seq(as.Date('2015-01-01'),
+              as.Date('2017-08-15'),
+              by = 1)
+  end_time <- date
+  # key <- c('fan_count', 'page_fan_adds', 'page_negative_feedback', 'page_positive_feedback_by_type', 'page_storytellers_by_age_gender', 'page_storytellers_by_city', 'page_storytellers_by_country', 'page_video_views', 'page_views')
+  name <- c('Lions Inc.', 'Pictures of monkeys', 'Zebraganza', 'Rhinos 4ever',
+            'Giraffes for laughs', 'Armadillo theatre', 'Friends of vampires', 'Videos of cats',
+            'Buy/sell stuff', 'Walk the walk', 'Talk the talk', 'Shake and bake', 'Dance in your pants',
+            'Board shorts wearers', 'Chevrolet fans', 'Chevrolet haters')
+  out <- df
+  name_dict <- data.frame(name = sort(unique(df$name)),
+                          new_name = sample(name, length(name)))
+  # Replace the values
+  out <- out %>%
+    left_join(name_dict,
+              by = 'name') %>%
+    dplyr::select(-name) %>%
+    mutate(name = new_name) %>%
+    dplyr::select(-new_name)
+  
+  # Change the dates
+  out$date <- out$date - 125
+  
+  # Jitter the values
+  out <- out %>%
+    mutate(value = jitter(value, factor = 1000)) %>%
+    mutate(value = ifelse(value < 0, 0, value)) %>%
+    mutate(value = round(value))
+  
+  # Return the new dataframe
+  return(out)
+  
+}
