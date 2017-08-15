@@ -1,7 +1,7 @@
 ---
 title: "INSIDER-facebook performance dashboard"
 params:
-  get_new_data: True
+  get_new_data: False
 output: flexdashboard::flex_dashboard
 keep_tex: True
 ---
