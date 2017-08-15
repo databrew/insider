@@ -120,9 +120,12 @@ df <-
   arrange(date) %>%
   group_by(key, sub_key, name) %>%
   mutate(value_cum = cum_summer(value))
+
+# Upload new data
+upload_new <- params$get_new_data
 ```
 
-```{r, eval = TRUE}
+```{r, eval = upload_new}
 # Having now retrieved and cleaned the most recent data,
 # time to upload the most recent data to google sheets
 setwd('../credentials/')
