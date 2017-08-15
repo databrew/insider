@@ -1,7 +1,8 @@
 ---
-title: "INSIDER-facebook performance dashboard"
+title: "databrew's facebook multi-page performance dashboard"
 params:
-  get_new_data: True
+  get_new_data: False
+  use_fake_data: True
 output: flexdashboard::flex_dashboard
 keep_tex: True
 ---
@@ -40,9 +41,7 @@ knitr::opts_chunk$set(comment = NA,
                message = FALSE, 
                error = TRUE, # Render report, even with errors
                cache = F)
-```
 
-```{r}
 # Get new data if need be
 if(params$get_new_data){
   owd <- getwd()
@@ -53,6 +52,9 @@ if(params$get_new_data){
 
 # Read in the data
 df <- read_csv('../data/historical.csv')
+if(params$use_fake_data){
+  df <- generate_fake_data(df = df)
+} 
 
 # Re-format the date
 df$date <- as.Date(df$date)
@@ -108,10 +110,7 @@ df <- df %>%
   filter(date >= starter)
 
 # Clean up names
-df$x <- gsub('thisis|insider', '', tolower(df$name))
-df$name <- ifelse(df$name != 'thisisinsider', df$x, df$name)
-df$name[df$name == 'thisisinsder'] <- 'This Is Insider'
-df$name <- Hmisc::capitalize(df$name)
+df$name <- Hmisc::capitalize(as.character(df$name))
 df$x <- NULL
 
 # Get a cumulative count
@@ -122,38 +121,6 @@ df <-
   mutate(value_cum = cum_summer(value))
 ```
 
-```{r, eval = TRUE}
-# Having now retrieved and cleaned the most recent data,
-# time to upload the most recent data to google sheets
-setwd('../credentials/')
-
-# Identify the sheet
-this_sheet <- gs_ls("databrew-insider raw data")
-
-# Register the sheet
-this_sheet_registered <- gs_key(x = this_sheet$sheet_key)
-
-# Define todays data
-todays_data <- df %>%
-  ungroup %>%
-            filter(date == max(date, na.rm = TRUE)) %>%
-  dplyr::select(-end_time, -sub_key, -lon, -lat) %>%
-  filter(key %in% c('page_fan_adds',
-                    'page_video_views'))
-
-
-# Write a csv of just today's data
-# write_csv(todays_data, '../reports/google/insider_raw_data.csv')
-# gs_upload(file = '../reports/google/insider_raw_data.csv',
-#           overwrite = FALSE)
-gs_edit_cells(ss = this_sheet_registered,
-              ws = 1,
-              input = todays_data,
-              anchor = 'A1',
-              col_names = TRUE,
-              trim = TRUE)
-setwd('../reports/')
-```
 
 
 Yesterday
@@ -206,7 +173,7 @@ Column {.tabset}
 
 ### Yesterday's views to fan adds correlation
 
-The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passers-by). 
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with <company name> on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passers-by). 
     
 ```{r}
 x <- 
@@ -239,7 +206,7 @@ ggplotly(g, tootip = 'name') %>%
 
 ### Avg views to fan adds correlation
 
-The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with Insider on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
+The correlation between views (x-axis) and fan adds (y-axis) is one indicator of how people interact with <company name> on different facebook pages. The (blue) line of best fit shows the general associaton between the two metrics. Those points above the line get more fan adds than their view counts would suggest (ie, passionate fans); those below the line get more counts but fewer than expected fan adds (ie, passer-bys). 
     
 ```{r}
 
@@ -508,147 +475,16 @@ map_city(page = 'all')
 ```
 
 
-
-### Art
-
-```{r}
-page = 'Art'
-
-map_city(page)
-
-```
-### Beauty
-
-```{r}
-page = 'Beauty'
-
-map_city(page)
-
-```
-
-### Cheese
-
-```{r}
-page = 'Cheese'
-
-map_city(page)
-
-```
-
-### Design
-
-```{r}
-page = 'Design'
-
-map_city(page)
-
-```
-
-### Dessert
-
-```{r}
-page = 'Dessert'
-
-map_city(page)
-
-```
-
-### Fitness
-
-```{r}
-page = 'Fitness'
-
-map_city(page)
-
-```
-
-### Food
-
-```{r}
-page = 'Food'
-
-map_city(page)
-
-```
-
-### Home
-
-```{r}
-page = 'Home'
-
-map_city(page)
-
-```
-
-### Inventions
-
-```{r}
-page = 'Inventions'
-
-map_city(page)
-
-```
-
-### Kitchen
-
-```{r}
-page = 'Kitchen'
-
-map_city(page)
-
-```
-
-### Popculture
-
-```{r}
-page = 'Popculture'
-
-map_city(page)
-
-```
-
-### Science
-
-```{r}
-page = 'Science'
-
-map_city(page)
-
-```
-
-### Style
-
-```{r}
-page = 'Style'
-
-map_city(page)
-
-```
-
-### Thisisinsider
-
-```{r}
-page = 'Thisisinsider'
-
-map_city(page)
-
-```
-
-### Travel
-
-```{r}
-page = 'Travel'
-
-map_city(page)
-
-```
-
-### Video
-
-```{r}
-page = 'Video'
-
-map_city(page)
+```{r, results='asis'}
+names <- sort(unique(df$name))
+for (i in 1:length(names)){
+  this_name <- names[i]
+cat('\n')  
+cat(paste0('### ', this_name, '\n\n'))
+page <- this_name
+print(map_city(page))
+cat("\n\n") 
+}
 
 ```
 
@@ -819,171 +655,19 @@ ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>%
 
 ```
 
-### Art
-
-```{r}
-
-page = 'Art'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
-```
-
-### Beauty
-
-```{r}
-page = 'Beauty'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Cheese
-
-```{r}
-page = 'Cheese'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Design
-
-```{r}
-page = 'Design'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Dessert
-
-```{r}
-page = 'Dessert'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Fitness
-
-```{r}
-page = 'Fitness'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Food
-
-```{r}
-page = 'Food'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Home
-
-```{r}
-page = 'Home'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Inventions
-
-```{r}
-page = 'Inventions'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Kitchen
-
-```{r}
-page = 'Kitchen'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Popculture
-
-```{r}
-page = 'Popculture'
-div =1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-```
-
-### Science 
-
-```{r}
-page = 'Science'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
-```
-
-### style 
-
-```{r}
-page = 'Style'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
-```
-
-### ThisIsInsider
-
-```{r}
-page = 'Thisisinsider'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
-```
-
-### Travel
-
-```{r}
-page = 'Travel'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
-```
-
-### Video
-
-```{r}
-page = 'Video'
-div = 1000000
-p <- simple_chart(page = page, div = div)
-ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
-   layout(autosize = F, width = 550, height = 500)
-
+```{r, results = 'asis'}
+names <- sort(unique(df$name))
+for (i in 1:length(names)){
+  this_name <- names[i]
+  cat('\n\n')
+  cat(paste0('### ', this_name, '\n\n'))
+  page <- this_name
+  div <- 1000000
+  p <- simple_chart(page = page, div = div)
+  # ggplotly(p, tooltip = c('value_cum/div', 'sub_key')) %>% 
+  #  layout(autosize = F, width = 550, height = 500)
+  print(p)
+}
 ```
 
 
@@ -998,7 +682,7 @@ Row {data-height=300}
 The dashboard automatically stores several types of data:
 - A raw data snapshot for retrieval, archiving, and backups.
 - A master dataset for analysis by data scientists.
-- A daily google spreadsheet update for analysts: https://docs.google.com/spreadsheets/d/1Q7qZqSo_K-2d09xe4SDo5arZxIKd84-l4v4qm-BN0jM/edit#gid=0
+- A daily google spreadsheet update for analysts: (url hidden)
 
 Row {data-height=700}
 -------------------------------------
