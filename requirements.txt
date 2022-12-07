@@ -1,4 +1,4 @@
-certifi==2017.4.17
+certifi==2022.12.7
 chardet==3.0.4
 -e git+https://github.com/mobolic/facebook-sdk.git@9dbf209abd927eb80d699ddafdd9a6a2692336d4#egg=facebook_sdk
 idna==2.5
